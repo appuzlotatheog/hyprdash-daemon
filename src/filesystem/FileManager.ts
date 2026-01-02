@@ -245,4 +245,17 @@ export class FileManager {
         const fullPath = this.resolvePath(serverId, filePath);
         return createWriteStream(fullPath);
     }
+
+    async downloadFile(serverId: string, url: string, filePath: string): Promise<void> {
+        const fullPath = this.resolvePath(serverId, filePath);
+        await fs.mkdir(path.dirname(fullPath), { recursive: true });
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.statusText}`);
+        }
+
+        const buffer = await response.arrayBuffer();
+        await fs.writeFile(fullPath, Buffer.from(buffer));
+    }
 }

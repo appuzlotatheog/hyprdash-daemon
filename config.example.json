@@ -1,6 +1,0 @@
-{
-    "panelUrl": "http://localhost:3001",
-    "token": "YOUR_NODE_TOKEN_FROM_PANEL",
-    "port": 8080,
-    "serversDir": "./servers"
-}

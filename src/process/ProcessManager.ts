@@ -16,6 +16,8 @@ interface StartConfig {
     env: Record<string, string>;
     memory: number;
     cpu: number;
+    port?: number;           // Allocated port
+    ip?: string;             // Allocated IP
     mounts?: Array<{ source: string; target: string; readOnly: boolean }>;
     onOutput: (line: string) => void;
     onStatusChange: (status: string) => void;
@@ -56,6 +58,11 @@ export class ProcessManager {
 
         // Ensure server directory exists
         await fs.mkdir(serverPath, { recursive: true });
+
+        // Update server.properties with correct port/IP before starting
+        if (config.port || config.ip) {
+            await this.updateServerProperties(serverPath, config.port, config.ip);
+        }
 
         // Setup mounts (symlinks)
         if (config.mounts) {
@@ -275,5 +282,57 @@ export class ProcessManager {
         }
 
         return parts;
+    }
+
+    // Update server.properties with correct port and IP
+    private async updateServerProperties(serverPath: string, port?: number, ip?: string): Promise<void> {
+        const propsPath = path.join(serverPath, 'server.properties');
+
+        try {
+            // Check if file exists
+            await fs.access(propsPath);
+
+            // Read existing content
+            let content = await fs.readFile(propsPath, 'utf-8');
+
+            // Update port
+            if (port) {
+                content = content.replace(/server-port=\d+/g, `server-port=${port}`);
+                content = content.replace(/query\.port=\d+/g, `query.port=${port}`);
+                // If server-port doesn't exist, add it
+                if (!content.includes('server-port=')) {
+                    content += `\nserver-port=${port}`;
+                }
+            }
+
+            // Update IP
+            if (ip) {
+                content = content.replace(/server-ip=.*/g, `server-ip=${ip}`);
+                // If server-ip doesn't exist, add it
+                if (!content.includes('server-ip=')) {
+                    content += `\nserver-ip=${ip}`;
+                }
+            }
+
+            // Write updated content
+            await fs.writeFile(propsPath, content);
+            console.log(`[Config] Updated server.properties: port=${port}, ip=${ip}`);
+        } catch (error) {
+            // File doesn't exist yet - that's okay, server will create it on first run
+            // But we can create a minimal one
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                const minimalProps = [
+                    `server-port=${port || 25565}`,
+                    `server-ip=${ip || '0.0.0.0'}`,
+                    `query.port=${port || 25565}`,
+                    `enable-query=true`,
+                ].join('\n');
+
+                await fs.writeFile(propsPath, minimalProps);
+                console.log(`[Config] Created minimal server.properties: port=${port}, ip=${ip}`);
+            } else {
+                console.error('[Config] Error updating server.properties:', error);
+            }
+        }
     }
 }

@@ -25,7 +25,7 @@ export class InstallManager {
     private activeInstalls: Map<string, ChildProcess> = new Map();
 
     constructor(baseDirectory: string) {
-        this.baseDirectory = baseDirectory;
+        this.baseDirectory = path.resolve(baseDirectory);
     }
 
     async installServer(
@@ -85,6 +85,8 @@ export class InstallManager {
             };
 
             console.log(`🔧 Running install script for ${config.serverId}`);
+            console.log(`📁 Script path: ${scriptPath}`);
+            console.log(`📁 Server dir: ${serverDir}`);
 
             const child = spawn('bash', [scriptPath], {
                 cwd: serverDir,

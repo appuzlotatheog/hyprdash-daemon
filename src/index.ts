@@ -7,6 +7,7 @@ import { ResourceMonitor } from './monitor/ResourceMonitor.js';
 import { FileManager } from './filesystem/FileManager.js';
 import { InstallManager } from './install/InstallManager.js';
 import { BackupManager } from './backup/BackupManager.js';
+import { QueryManager } from './query/QueryManager.js';
 
 interface DaemonConfig {
     panel_url: string;
@@ -347,6 +348,20 @@ class Daemon {
             }
         });
 
+        this.socket.on('files:download', async (data: { serverId: string; url: string; path: string; requestId: string }) => {
+            console.log(`⬇️ Downloading file to ${data.path}`);
+            try {
+                await this.fileManager.downloadFile(data.serverId, data.url, data.path);
+                this.socket.emit('files:download:response', { requestId: data.requestId, success: true });
+            } catch (error) {
+                console.error(`Download failed:`, error);
+                this.socket.emit('files:error', {
+                    requestId: data.requestId,
+                    error: error instanceof Error ? error.message : 'Download failed'
+                });
+            }
+        });
+
         // Backup operations
         this.socket.on('backup:create', async (data: {
             serverId: string;
@@ -421,6 +436,22 @@ class Daemon {
                 });
             }
         });
+
+        // Server Query
+        this.socket.on('server:query', async (data: { serverId: string; type: string; host: string; port: number; requestId: string }) => {
+            try {
+                const result = await QueryManager.query(data.type, data.host, data.port);
+                this.socket.emit('server:query:response', {
+                    requestId: data.requestId,
+                    result
+                });
+            } catch (error) {
+                this.socket.emit('server:query:error', {
+                    requestId: data.requestId,
+                    error: error instanceof Error ? error.message : 'Failed to query server'
+                });
+            }
+        });
     }
 
     private async handleServerStart(serverId: string, config: any) {
@@ -470,6 +501,8 @@ class Daemon {
             env,
             memory: config.memory,
             cpu: config.cpu,
+            port: config.allocation?.port,
+            ip: config.allocation?.ip,
             mounts: config.mounts,
             onOutput: (line: string) => {
                 this.socket.emit('server:console', { serverId, line });

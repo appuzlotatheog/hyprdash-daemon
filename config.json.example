@@ -1,0 +1,12 @@
+{
+  "panel": {
+    "url": "http://localhost:3000",
+    "token": "your-node-token-from-panel"
+  },
+  "system": {
+    "check_interval": 5000,
+    "data_directory": "./servers",
+    "backup_directory": "./backups",
+    "log_directory": "./logs"
+  }
+}
