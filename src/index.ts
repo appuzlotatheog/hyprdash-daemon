@@ -35,6 +35,8 @@ class Daemon {
     private fileManager!: FileManager;
     private installManager!: InstallManager;
     private backupManager!: BackupManager;
+    // Console history buffer per server (last 200 lines)
+    private consoleHistory: Map<string, string[]> = new Map();
 
     async start() {
         console.log('🚀 Starting Game Panel Daemon...');
@@ -452,6 +454,16 @@ class Daemon {
                 });
             }
         });
+
+        // Console history request from panel (when client subscribes/reconnects)
+        this.socket.on('server:console:history:request', (data: { serverId: string }) => {
+            console.log(`📋 Console history request for server ${data.serverId}`);
+            const history = this.consoleHistory.get(data.serverId) || [];
+            this.socket.emit('server:console:history', {
+                serverId: data.serverId,
+                lines: history
+            });
+        });
     }
 
     private async handleServerStart(serverId: string, config: any) {
@@ -505,9 +517,22 @@ class Daemon {
             ip: config.allocation?.ip,
             mounts: config.mounts,
             onOutput: (line: string) => {
+                // Store in history buffer (max 200 lines)
+                if (!this.consoleHistory.has(serverId)) {
+                    this.consoleHistory.set(serverId, []);
+                }
+                const history = this.consoleHistory.get(serverId)!;
+                history.push(line);
+                if (history.length > 200) {
+                    history.shift();
+                }
                 this.socket.emit('server:console', { serverId, line });
             },
             onStatusChange: (status: string) => {
+                // Clear console history when server stops
+                if (status === 'OFFLINE') {
+                    this.consoleHistory.delete(serverId);
+                }
                 this.socket.emit('server:status', { serverId, status });
             },
         });
