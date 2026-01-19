@@ -55,5 +55,3 @@ npm start
 ## Security
 The daemon implements strict path validation to ensure file operations are restricted to the assigned server directories.
 
-## License
-MIT
